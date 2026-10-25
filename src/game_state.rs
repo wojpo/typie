@@ -1,5 +1,8 @@
+use std::collections::VecDeque;
+
 pub struct GameState {
     curr_word: String,
+    words_queue: VecDeque<String>,
     word_limit: u16,
     correct: u16,
     wrong: u16,
@@ -23,11 +26,11 @@ impl GameState {
     pub fn overall_chars_counter(&self) -> u16 {
         self.overall_chars_counter
     }
-
     pub fn new(word_limit: u16, word: &str) -> Self {
         Self {
             curr_word: word.to_string(),
             word_limit,
+            words_queue: VecDeque::new(),
             correct: 0,
             wrong: 0,
             typed_chars: Vec::new(),
@@ -61,9 +64,20 @@ impl GameState {
         else { self.wrong += 1; }
     }
 
-    pub fn start_word(&mut self, word: &str) {
+    pub fn next_word(&self) -> Option<&str> {
+        let remaining = self.word_limit.saturating_sub(self.completed_words());
+
+        if remaining <= 1 {
+            return None;
+        }
+
+        self.words_queue.front().map(String::as_str)
+    }
+
+    pub fn start_word(&mut self, new_preview_word: &str) {
+        self.enqueue_word(new_preview_word);
+        self.curr_word = self.words_queue.pop_front().unwrap();
         self.typed_chars.clear();
-        self.curr_word = word.to_string();
     }
 
     pub fn is_finished(&self) -> bool {
@@ -76,6 +90,10 @@ impl GameState {
 
     pub fn completed_words(&self) -> u16 {
         self.correct + self.wrong
+    }
+
+    pub fn enqueue_word(&mut self, word: &str) {
+        self.words_queue.push_back(word.to_string());
     }
 }
 
@@ -238,5 +256,28 @@ mod tests {
 
         assert!(game.is_word_complete());
         assert!(game.is_word_correct());
+    }
+
+    #[test]
+    fn queued_word_becomes_current_word() {
+        let mut game = GameState::new(3, "cat");
+        game.enqueue_word("dog");
+
+        assert_eq!(game.next_word(), Some("dog"));
+
+        type_word(&mut game, "cat");
+        game.finish_word();
+        game.start_word("bird");
+
+        assert_eq!(game.curr_word(), "dog");
+        assert_eq!(game.next_word(), Some("bird"));
+        assert!(game.typed_chars().is_empty());
+
+        type_word(&mut game, "dog");
+        game.finish_word();
+        game.start_word("fish");
+
+        assert_eq!(game.curr_word(), "bird");
+        assert_eq!(game.next_word(), None);
     }
 }

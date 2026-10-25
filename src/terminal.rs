@@ -1,10 +1,10 @@
+use crossterm::cursor::MoveTo;
+use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
+use crossterm::terminal::{Clear, ClearType};
+use crossterm::queue;
 use std::io;
 use std::io::Write;
 use std::time::Duration;
-use crossterm::cursor::{MoveLeft, MoveTo, RestorePosition, SavePosition};
-use crossterm::{execute, queue};
-use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
-use crossterm::terminal::{Clear, ClearType};
 
 use crate::game_state::GameState;
 
@@ -43,11 +43,23 @@ pub fn render_game(game: &GameState) -> io::Result<()> {
     queue!(
         stdout,
         ResetColor,
-        MoveTo(4, 8),
+        MoveTo(4, 9),
         SetForegroundColor(Color::DarkGrey),
         Print("Backspace: correct | Enter: finish"),
         ResetColor
     )?;
+
+    queue!(
+    stdout,
+    MoveTo(4, 7),
+    Clear(ClearType::CurrentLine),
+    )?;
+
+    if let Some(word) = game.next_word() {
+        queue!(stdout, Print(format!("Next: {word}")))?;
+    }
+
+    queue!(stdout, ResetColor)?;
 
     stdout.flush()
 }

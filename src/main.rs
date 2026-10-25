@@ -27,6 +27,7 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
 
     let mut start: Option<Instant> = None;
     let mut game = GameState::new(counter, typeword);
+    game.enqueue_word(*words.iter().choose(&mut rng).unwrap());
 
     execute!(io::stdout(), EnterAlternateScreen, Hide, Clear(ClearType::All))?;
     render_game(&game)?;
