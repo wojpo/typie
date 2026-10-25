@@ -1,19 +1,20 @@
 mod game_state;
 mod terminal;
 
+use crate::terminal::{render_game, render_result};
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::KeyEventKind;
 use crossterm::style::ResetColor;
+use crossterm::terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{
     event::{Event, KeyCode, read},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode},
 };
-use rand::prelude::IteratorRandom;
-use std::{fs, io};
-use std::time::{Duration, Instant};
-use crate::terminal::{new_line, restore_char, show_typed_char, show_word};
 use game_state::GameState;
+use rand::prelude::IteratorRandom;
+use std::time::{Duration, Instant};
+use std::{fs, io};
 
 fn game(counter: u16) -> io::Result<(GameState, Duration)> {
     let content = fs::read_to_string("words.txt")?;
@@ -27,19 +28,19 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
     let mut start: Option<Instant> = None;
     let mut game = GameState::new(counter, typeword);
 
-    execute!(io::stdout(), Hide)?;
-    show_word(game.curr_word())?;
+    execute!(io::stdout(), EnterAlternateScreen, Hide, Clear(ClearType::All))?;
+    render_game(&game)?;
 
     loop {
-        if let Event::Key(key) = read()? {
-            if key.kind != KeyEventKind::Press {
-                continue;
-            }
+        match read()? {
+            Event::Key(key) => {
+                if key.kind != KeyEventKind::Press {
+                    continue;
+                }
 
-            match key.code {
+                match key.code {
                 KeyCode::Char(character) => {
                     start.get_or_insert_with(Instant::now);
-                    show_typed_char(character, game.is_char_correct(character))?;
 
                     game.type_char(character);
 
@@ -52,8 +53,6 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
                         }
 
                         game.start_word(*words.iter().choose(&mut rng).unwrap());
-
-                        show_word(game.curr_word())?;
                     }
 
 
@@ -61,47 +60,64 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
                 KeyCode::Backspace => {
                     if !game.typed_chars().is_empty() {
                         game.backspace();
-
-                        if let Some(character) = game.curr_word()
-                            .chars()
-                            .nth(game.typed_chars().len())
-                        {
-                            restore_char(character)?;
-                        }
                     }
                 },
                 KeyCode::Enter => break,
                 _ => {}
             }
+            render_game(&game)?;
+        }
+            Event::Resize(_, _) => {
+                execute!(io::stdout(), Clear(ClearType::All))?;
+                render_game(&game)?;
+            }
+
+            _ => {}
         }
     }
 
     let elapsed = start.map(|time| time.elapsed()).unwrap_or_default();
     Ok((game, elapsed))
 }
+
+fn run(counter: u16) -> io::Result<()> {
+    let (game_result, elapsed) = game(counter)?;
+
+    render_result(&game_result, elapsed)?;
+
+    loop {
+        match read()? {
+            Event::Key(key)
+            if key.kind == KeyEventKind::Press
+                && key.code == KeyCode::Enter =>
+                {
+                    break;
+                }
+            Event::Resize(_, _) => {
+                render_result(&game_result, elapsed)?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
 fn main() -> io::Result<()> {
-    let counter = 20;
     enable_raw_mode()?;
 
-    let result = game(counter);
-    let cursor_result = execute!(io::stdout(), Show, ResetColor);
+    let result = run(20);
+
+    let screen_result = execute!(
+        io::stdout(),
+        ResetColor,
+        Show,
+        LeaveAlternateScreen
+    );
     let raw_result = disable_raw_mode();
 
-    let (game_result, elapsed) = result?;
-    cursor_result?;
+    result?;
+    screen_result?;
     raw_result?;
-
-    println!("\n\nCorrect: {}/{}", game_result.correct(), game_result.completed_words());
-    println!("\nTime Elapsed: {:.2} seconds", elapsed.as_secs_f64());
-    let minutes = elapsed.as_secs_f64() / 60.0;
-
-    let wpm = if minutes > 0.0 {
-        (game_result.overall_chars_counter() as f64 / 5.0) / minutes
-    } else {
-        0.0
-    };
-
-    println!("\nWPM: {:.1}", wpm);
 
     Ok(())
 }
