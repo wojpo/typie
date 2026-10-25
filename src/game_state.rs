@@ -62,8 +62,170 @@ impl GameState {
     pub fn is_char_correct(&self, character: char) -> bool {
         self.curr_word.chars().nth(self.typed_chars.len()) == Some(character)
     }
-    
+
     pub fn completed_words(&self) -> u16 {
         self.correct + self.wrong
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn type_word(game: &mut GameState, word: &str) {
+        for character in word.chars() {
+            game.type_char(character);
+        }
+    }
+
+    #[test]
+    fn new_game_has_empty_state() {
+        let game = GameState::new(15, "cat");
+
+        assert_eq!(game.curr_word, "cat");
+        assert_eq!(game.word_limit, 15);
+        assert_eq!(game.correct, 0);
+        assert_eq!(game.wrong, 0);
+        assert!(game.typed_chars.is_empty());
+        assert!(!game.is_finished());
+        assert!(!game.is_word_complete());
+    }
+
+    #[test]
+    fn partial_word_is_not_complete() {
+        let mut game = GameState::new(15, "cat");
+        type_word(&mut game, "ca");
+
+        assert!(!game.is_word_complete());
+        assert!(!game.is_word_correct());
+    }
+
+    #[test]
+    fn correct_word_updates_score() {
+        let mut game = GameState::new(15, "cat");
+        type_word(&mut game, "cat");
+
+        assert!(game.is_word_complete());
+        assert!(game.is_word_correct());
+
+        game.finish_word();
+
+        assert_eq!(game.correct, 1);
+        assert_eq!(game.wrong, 0);
+        assert_eq!(game.completed_words(), 1);
+    }
+
+    #[test]
+    fn wrong_word_updates_score() {
+        let mut game = GameState::new(15, "cat");
+        type_word(&mut game, "car");
+
+        assert!(game.is_word_complete());
+        assert!(!game.is_word_correct());
+
+        game.finish_word();
+
+        assert_eq!(game.correct, 0);
+        assert_eq!(game.wrong, 1);
+        assert_eq!(game.completed_words(), 1);
+    }
+
+    #[test]
+    fn backspace_removes_last_char() {
+        let mut game = GameState::new(15, "cat");
+        type_word(&mut game, "ca");
+
+        game.backspace();
+
+        assert_eq!(game.typed_chars, vec!['c']);
+        assert!(!game.is_word_complete());
+    }
+
+    #[test]
+    fn backspace_on_empty_input_is_safe() {
+        let mut game = GameState::new(15, "cat");
+
+        game.backspace();
+
+        assert!(game.typed_chars.is_empty());
+        assert_eq!(game.correct, 0);
+        assert_eq!(game.wrong, 0);
+    }
+
+    #[test]
+    fn corrected_typo_can_produce_correct_word() {
+        let mut game = GameState::new(15, "cat");
+        type_word(&mut game, "cx");
+
+        game.backspace();
+        type_word(&mut game, "at");
+        game.finish_word();
+
+        assert!(game.is_word_correct());
+        assert_eq!(game.correct, 1);
+        assert_eq!(game.wrong, 0);
+    }
+
+    #[test]
+    fn start_word_resets_input_and_keeps_score() {
+        let mut game = GameState::new(15, "cat");
+        type_word(&mut game, "cat");
+        game.finish_word();
+
+        game.start_word("dog");
+
+        assert_eq!(game.curr_word, "dog");
+        assert!(game.typed_chars.is_empty());
+        assert_eq!(game.correct, 1);
+        assert_eq!(game.wrong, 0);
+        assert!(!game.is_word_complete());
+    }
+
+    #[test]
+    fn session_finishes_at_word_limit() {
+        let mut game = GameState::new(2, "cat");
+        type_word(&mut game, "cat");
+        game.finish_word();
+
+        assert!(!game.is_finished());
+
+        game.start_word("dog");
+        type_word(&mut game, "dot");
+        game.finish_word();
+
+        assert!(game.is_finished());
+        assert_eq!(game.completed_words(), 2);
+        assert_eq!(game.correct, 1);
+        assert_eq!(game.wrong, 1);
+    }
+
+    #[test]
+    fn next_char_is_checked_at_current_position() {
+        let mut game = GameState::new(15, "cat");
+
+        assert!(game.is_char_correct('c'));
+        assert!(!game.is_char_correct('a'));
+
+        game.type_char('c');
+
+        assert!(game.is_char_correct('a'));
+        assert!(!game.is_char_correct('c'));
+
+        game.backspace();
+
+        assert!(game.is_char_correct('c'));
+    }
+
+    #[test]
+    fn unicode_word_uses_character_count() {
+        let mut game = GameState::new(15, "żaba");
+        type_word(&mut game, "żab");
+
+        assert!(!game.is_word_complete());
+
+        game.type_char('a');
+
+        assert!(game.is_word_complete());
+        assert!(game.is_word_correct());
     }
 }
