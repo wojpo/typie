@@ -28,7 +28,7 @@ fn game(counter: u16, animation_start: &Instant) -> io::Result<(GameState, Durat
 
     let mut start: Option<Instant> = None;
     let mut game = GameState::new(counter, typeword);
-    game.enqueue_word(*words.iter().choose(&mut rng).unwrap());
+    game.enqueue_word(words.iter().choose(&mut rng).unwrap());
 
     execute!(io::stdout(), Clear(ClearType::All))?;
 
@@ -58,7 +58,7 @@ fn game(counter: u16, animation_start: &Instant) -> io::Result<(GameState, Durat
                                 break;
                             }
 
-                            game.start_word(*words.iter().choose(&mut rng).unwrap());
+                            game.start_word(words.iter().choose(&mut rng).unwrap());
                         }
                     }
                     KeyCode::Backspace => {
@@ -187,10 +187,10 @@ fn app() -> io::Result<()> {
                         _ => unreachable!(),
                     };
 
-                    if let Some(counter) = counter {
-                        if !run(counter, &animation_start)? {
-                            return Ok(());
-                        }
+                    if let Some(counter) = counter
+                        && !run(counter, &animation_start)?
+                    {
+                        return Ok(());
                     }
 
                     execute!(io::stdout(), Clear(ClearType::All))?;

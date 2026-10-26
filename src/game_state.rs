@@ -85,6 +85,7 @@ impl GameState {
         self.correct + self.wrong >= self.word_limit
     }
 
+    #[cfg(test)]
     pub fn is_char_correct(&self, character: char) -> bool {
         self.curr_word.chars().nth(self.typed_chars.len()) == Some(character)
     }

@@ -13,7 +13,7 @@ use crossterm::{
 use crate::game_state::GameState;
 
 fn render_header(stdout: &mut impl Write, elapsed: Duration) -> io::Result<()> {
-    let cursor = if (elapsed.as_millis() / 500) % 2 == 0 {
+    let cursor = if (elapsed.as_millis() / 500).is_multiple_of(2) {
         "_"
     } else {
         " "
