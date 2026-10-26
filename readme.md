@@ -1,40 +1,45 @@
 # Typie
 
-A terminal typing game built with Rust and Crossterm.
+A terminal typing game built while learning Rust.
 
-Practice typing with word-count sessions, instant character feedback,
-and speed statistics.
+Choose a session length, type random words, and get instant character
+feedback. Check your score, time, and WPM after each session.
 
-## Features
+## Tech stack
 
-- Preset sessions: 10, 20, or 50 words
-- Custom sessions: 1–1000 words
-- Green/red character feedback
-- Backspace support
-- Upcoming word preview
-- Session time and WPM results
-- Retry and return to the main menu
-- Animated headers and terminal resize handling
+Rust, Crossterm, and Rand.
+
+Game logic and terminal rendering are separated into modules, with unit
+tests covering typing, scoring, backspace, and word progression.
 
 ## Download
 
 Download the Windows version from [Releases](https://github.com/wojpo/typie/releases),
 extract the ZIP, and run `typie.exe`.
 
+The word list is embedded in the executable, so no additional files are needed.
 
-## Run from source
+## Getting started
 
-Install [Rust](https://rustup.rs/), then run:
+Install [Rust](https://rustup.rs/), then clone the repository:
 
-```sh
+```bash
 git clone https://github.com/wojpo/typie.git
 cd typie
 cargo run --release
 ```
 
+## Build
+
+```bash
+cargo build --release
+```
+
+The executable is available in `target/release`.
+
 ## Development
 
-```sh
+```bash
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
