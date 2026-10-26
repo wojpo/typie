@@ -60,8 +60,9 @@ impl GameState {
     pub fn finish_word(&mut self) {
         if self.is_word_correct() {
             self.correct += 1;
+        } else {
+            self.wrong += 1;
         }
-        else { self.wrong += 1; }
     }
 
     pub fn next_word(&self) -> Option<&str> {

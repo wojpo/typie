@@ -12,10 +12,7 @@ use crossterm::{
 
 use crate::game_state::GameState;
 
-fn render_header(
-    stdout: &mut impl Write,
-    elapsed: Duration,
-) -> io::Result<()> {
+fn render_header(stdout: &mut impl Write, elapsed: Duration) -> io::Result<()> {
     let cursor = if (elapsed.as_millis() / 500) % 2 == 0 {
         "_"
     } else {
@@ -32,10 +29,7 @@ fn render_header(
     )
 }
 
-pub fn render_game(
-    game: &GameState,
-    animation_elapsed: Duration,
-) -> io::Result<()> {
+pub fn render_game(game: &GameState, animation_elapsed: Duration) -> io::Result<()> {
     let mut stdout = io::stdout();
 
     render_header(&mut stdout, animation_elapsed)?;
@@ -58,11 +52,7 @@ pub fn render_game(
             None => (expected, Color::White),
         };
 
-        queue!(
-            stdout,
-            SetForegroundColor(color),
-            Print(character)
-        )?;
+        queue!(stdout, SetForegroundColor(color), Print(character))?;
     }
 
     queue!(
@@ -133,10 +123,7 @@ pub fn render_result(
     stdout.flush()
 }
 
-pub fn render_start_menu(
-    selected: usize,
-    animation_elapsed: Duration,
-) -> io::Result<()> {
+pub fn render_start_menu(selected: usize, animation_elapsed: Duration) -> io::Result<()> {
     let mut stdout = io::stdout();
 
     let options = [
@@ -178,11 +165,7 @@ pub fn render_start_menu(
     stdout.flush()
 }
 
-pub fn render_custom_menu(
-    input: &str,
-    error: bool,
-    animation_elapsed: Duration,
-) -> io::Result<()> {
+pub fn render_custom_menu(input: &str, error: bool, animation_elapsed: Duration) -> io::Result<()> {
     let mut stdout = io::stdout();
 
     render_header(&mut stdout, animation_elapsed)?;
