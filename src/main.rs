@@ -3,7 +3,7 @@ mod terminal;
 
 use crate::terminal::{render_custom_menu, render_game, render_result, render_start_menu};
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::KeyEventKind;
+use crossterm::event::{poll, KeyEventKind};
 use crossterm::style::ResetColor;
 use crossterm::terminal::{Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{
@@ -16,7 +16,10 @@ use rand::prelude::IteratorRandom;
 use std::time::{Duration, Instant};
 use std::{fs, io};
 
-fn game(counter: u16) -> io::Result<(GameState, Duration)> {
+fn game(
+    counter: u16,
+    animation_start: &Instant,
+) -> io::Result<(GameState, Duration)> {
     let content = fs::read_to_string("words.txt")?;
     let words: Vec<&str> = content.split_whitespace().collect();
 
@@ -30,9 +33,14 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
     game.enqueue_word(*words.iter().choose(&mut rng).unwrap());
 
     execute!(io::stdout(), Clear(ClearType::All))?;
-    render_game(&game)?;
 
     loop {
+        render_game(&game, animation_start.elapsed())?;
+
+        if !poll(Duration::from_millis(50))? {
+            continue;
+        }
+
         match read()? {
             Event::Key(key) => {
                 if key.kind != KeyEventKind::Press {
@@ -66,11 +74,9 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
                 KeyCode::Enter => break,
                 _ => {}
             }
-            render_game(&game)?;
         }
             Event::Resize(_, _) => {
                 execute!(io::stdout(), Clear(ClearType::All))?;
-                render_game(&game)?;
             }
 
             _ => {}
@@ -81,12 +87,17 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
     Ok((game, elapsed))
 }
 
-fn run(counter: u16) -> io::Result<bool> {
+fn run(counter: u16, animation_start: &Instant) -> io::Result<bool> {
     loop {
-        let (game_result, elapsed) = game(counter)?;
-        render_result(&game_result, elapsed)?;
+        let (game_result, elapsed) = game(counter, animation_start)?;
+        execute!(io::stdout(), Clear(ClearType::All))?;
 
         loop {
+            render_result(&game_result, elapsed, animation_start.elapsed())?;
+
+            if !poll(Duration::from_millis(50))? {
+                continue;
+            }
             match read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     match key.code {
@@ -97,7 +108,7 @@ fn run(counter: u16) -> io::Result<bool> {
                     }
                 }
                 Event::Resize(_, _) => {
-                    render_result(&game_result, elapsed)?;
+                    execute!(io::stdout(), Clear(ClearType::All))?;
                 }
                 _ => {}
             }
@@ -105,13 +116,21 @@ fn run(counter: u16) -> io::Result<bool> {
     }
 }
 
-fn custom_word_count() -> io::Result<Option<u16>> {
+fn custom_word_count(
+    animation_start: &Instant,
+) -> io::Result<Option<u16>> {
     let mut input = String::new();
     let mut error = false;
 
-    render_custom_menu(&input, error)?;
+    execute!(io::stdout(), Clear(ClearType::All))?;
 
     loop {
+        render_custom_menu(&input, error, animation_start.elapsed())?;
+
+        if !poll(Duration::from_millis(50))? {
+            continue;
+        }
+
         match read()? {
             Event::Key(key) if key.kind == KeyEventKind::Press => {
                 match key.code {
@@ -136,11 +155,9 @@ fn custom_word_count() -> io::Result<Option<u16>> {
                     KeyCode::Char('q' | 'Q') => return Ok(None),
                     _ => {}
                 }
-
-                render_custom_menu(&input, error)?;
             }
             Event::Resize(_, _) => {
-                render_custom_menu(&input, error)?;
+                execute!(io::stdout(), Clear(ClearType::All))?;
             }
             _ => {}
         }
@@ -158,9 +175,14 @@ fn app() -> io::Result<()> {
     let mut selected: usize = 0;
     const OPTION_COUNT: usize = 4;
 
-    render_start_menu(selected)?;
+    let animation_start = Instant::now();
 
     loop {
+        render_start_menu(selected, animation_start.elapsed())?;
+
+        if !poll(Duration::from_millis(50))? {
+            continue;
+        }
         match read()? {
             Event::Key(key) if key.kind == KeyEventKind::Press => {
                 match key.code {
@@ -175,24 +197,24 @@ fn app() -> io::Result<()> {
                             0 => Some(10),
                             1 => Some(20),
                             2 => Some(50),
-                            3 => custom_word_count()?,
+                            3 => custom_word_count(&animation_start)?,
                             _ => unreachable!(),
                         };
 
                         if let Some(counter) = counter {
-                            if !run(counter)? {
+                            if !run(counter, &animation_start)? {
                                 return Ok(());
                             }
                         }
+
+                        execute!(io::stdout(), Clear(ClearType::All))?;
                     }
                     KeyCode::Char('q' | 'Q') => return Ok(()),
                     _ => {}
                 }
-
-                render_start_menu(selected)?;
             }
             Event::Resize(_, _) => {
-                render_start_menu(selected)?;
+                execute!(io::stdout(), Clear(ClearType::All))?;
             }
             _ => {}
         }
