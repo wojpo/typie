@@ -1,7 +1,7 @@
 mod game_state;
 mod terminal;
 
-use crate::terminal::{render_game, render_result};
+use crate::terminal::{render_custom_menu, render_game, render_result, render_start_menu};
 use crossterm::cursor::{Hide, Show};
 use crossterm::event::KeyEventKind;
 use crossterm::style::ResetColor;
@@ -29,7 +29,7 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
     let mut game = GameState::new(counter, typeword);
     game.enqueue_word(*words.iter().choose(&mut rng).unwrap());
 
-    execute!(io::stdout(), EnterAlternateScreen, Hide, Clear(ClearType::All))?;
+    execute!(io::stdout(), Clear(ClearType::All))?;
     render_game(&game)?;
 
     loop {
@@ -81,32 +81,128 @@ fn game(counter: u16) -> io::Result<(GameState, Duration)> {
     Ok((game, elapsed))
 }
 
-fn run(counter: u16) -> io::Result<()> {
-    let (game_result, elapsed) = game(counter)?;
+fn run(counter: u16) -> io::Result<bool> {
+    loop {
+        let (game_result, elapsed) = game(counter)?;
+        render_result(&game_result, elapsed)?;
 
-    render_result(&game_result, elapsed)?;
+        loop {
+            match read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    match key.code {
+                        KeyCode::Enter => return Ok(true),
+                        KeyCode::Char('q' | 'Q') => return Ok(false),
+                        KeyCode::Char('r' | 'R') => break,
+                        _ => {}
+                    }
+                }
+                Event::Resize(_, _) => {
+                    render_result(&game_result, elapsed)?;
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn custom_word_count() -> io::Result<Option<u16>> {
+    let mut input = String::new();
+    let mut error = false;
+
+    render_custom_menu(&input, error)?;
 
     loop {
         match read()? {
-            Event::Key(key)
-            if key.kind == KeyEventKind::Press
-                && key.code == KeyCode::Enter =>
-                {
-                    break;
+            Event::Key(key) if key.kind == KeyEventKind::Press => {
+                match key.code {
+                    KeyCode::Char(character) if character.is_ascii_digit() => {
+                        if input.len() < 4 {
+                            input.push(character);
+                            error = false;
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        input.pop();
+                        error = false;
+                    }
+                    KeyCode::Enter => {
+                        match input.parse::<u16>() {
+                            Ok(count) if (1..=1000).contains(&count) => {
+                                return Ok(Some(count));
+                            }
+                            _ => error = true,
+                        }
+                    }
+                    KeyCode::Char('q' | 'Q') => return Ok(None),
+                    _ => {}
                 }
+
+                render_custom_menu(&input, error)?;
+            }
             Event::Resize(_, _) => {
-                render_result(&game_result, elapsed)?;
+                render_custom_menu(&input, error)?;
             }
             _ => {}
         }
     }
-
-    Ok(())
 }
+
+fn app() -> io::Result<()> {
+    execute!(
+        io::stdout(),
+        EnterAlternateScreen,
+        Hide,
+        Clear(ClearType::All)
+    )?;
+
+    let mut selected: usize = 0;
+    const OPTION_COUNT: usize = 4;
+
+    render_start_menu(selected)?;
+
+    loop {
+        match read()? {
+            Event::Key(key) if key.kind == KeyEventKind::Press => {
+                match key.code {
+                    KeyCode::Down => {
+                        selected = (selected + 1) % OPTION_COUNT;
+                    }
+                    KeyCode::Up => {
+                        selected = (selected + OPTION_COUNT - 1) % OPTION_COUNT;
+                    }
+                    KeyCode::Enter => {
+                        let counter = match selected {
+                            0 => Some(10),
+                            1 => Some(20),
+                            2 => Some(50),
+                            3 => custom_word_count()?,
+                            _ => unreachable!(),
+                        };
+
+                        if let Some(counter) = counter {
+                            if !run(counter)? {
+                                return Ok(());
+                            }
+                        }
+                    }
+                    KeyCode::Char('q' | 'Q') => return Ok(()),
+                    _ => {}
+                }
+
+                render_start_menu(selected)?;
+            }
+            Event::Resize(_, _) => {
+                render_start_menu(selected)?;
+            }
+            _ => {}
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
     enable_raw_mode()?;
 
-    let result = run(20);
+    let result = app();
 
     let screen_result = execute!(
         io::stdout(),
@@ -122,3 +218,4 @@ fn main() -> io::Result<()> {
 
     Ok(())
 }
+
